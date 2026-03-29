@@ -2,12 +2,14 @@ import numpy as np
 from scipy.optimize import root_scalar
 
 class RocketStage:
-    def __init__(self, name, isp, structural_ratio):
+    def __init__(self, name, isp, structural_ratio, thrust):
         self.name = name
         self.isp = isp  # I_sp
+        self.thrust = thrust # F
         self.propellant_mass = 0  # m_P
         self.structural_mass = 0  # m_E
         self.exhaust_velocity = isp * 9.81 # Ve
+        self.mass_flow_rate = thrust / self.exhaust_velocity # m_dot
         self.mass_ratio = 0 # n
         self.total_mass = 0 # m0
         self.step_mass = 0 # m_i
@@ -71,17 +73,3 @@ class Rocket:
         for stage in self.stages:
             stage.structural_mass = stage.structural_ratio * stage.step_mass
             stage.propellant_mass = stage.step_mass - stage.structural_mass
-
-# Sizing of 3 stage rocket
-rocket = Rocket(payload_mass=3500, target_delta_v=5199)
-
-stage1 = RocketStage(name="Stage 1", isp=230, structural_ratio=0.15)
-stage2 = RocketStage(name="Stage 2", isp=250, structural_ratio=0.12)
-stage3 = RocketStage(name="Stage 3", isp=200, structural_ratio=0.1)
-
-rocket.add_stage(stage1)
-rocket.add_stage(stage2)
-rocket.add_stage(stage3)
-
-otpimal_eta = rocket.optimize_lagrange()
-rocket.calculate_stage_masses(otpimal_eta)
