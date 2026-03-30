@@ -53,6 +53,91 @@ class FlightSimulation:
 
         self.history = {}  # To store the trajectory history
 
+    def _wrap_to_pi(self, angle_rad):
+        return (angle_rad + np.pi) % (2.0 * np.pi) - np.pi
+
+    def _calculate_geospatial_history(self, position_history, time_history):
+        x = position_history[:, 0]
+        y = position_history[:, 1]
+        z = position_history[:, 2]
+
+        radius_xy = np.hypot(x, y)
+        radius = np.linalg.norm(position_history, axis=1)
+
+        geocentric_latitude = np.arctan2(z, radius_xy)
+        inertial_longitude = np.arctan2(y, x)
+
+        earth_rotation_rate = np.linalg.norm(omega_e)
+        geodetic_longitude = self._wrap_to_pi(inertial_longitude - earth_rotation_rate * time_history)
+        relative_longitude = self._wrap_to_pi(geodetic_longitude - np.radians(self.longitude))
+        absolute_height = radius - initialise.R_e
+
+        return np.hstack(
+            (
+                geocentric_latitude[:, None],
+                geodetic_longitude[:, None],
+                inertial_longitude[:, None],
+                relative_longitude[:, None],
+                absolute_height[:, None],
+            )
+        )
+
+    def _calculate_flight_kinematics_history(self, position_history, velocity_history):
+        radius = np.linalg.norm(position_history, axis=1)
+        radius_safe = np.maximum(radius, 1e-12)
+
+        radial_unit = position_history / radius_safe[:, None]
+        velocity_rel = velocity_history - np.cross(omega_e, position_history)
+
+        speed_abs = np.linalg.norm(velocity_history, axis=1)
+        speed_rel = np.linalg.norm(velocity_rel, axis=1)
+        speed_abs_safe = np.maximum(speed_abs, 1e-12)
+        speed_rel_safe = np.maximum(speed_rel, 1e-12)
+
+        radial_speed_abs = np.einsum("ij,ij->i", velocity_history, radial_unit)
+        radial_speed_rel = np.einsum("ij,ij->i", velocity_rel, radial_unit)
+
+        horizontal_speed_abs = np.sqrt(np.maximum(speed_abs**2 - radial_speed_abs**2, 0.0))
+        horizontal_speed_rel = np.sqrt(np.maximum(speed_rel**2 - radial_speed_rel**2, 0.0))
+
+        flight_path_angle_abs = np.arctan2(radial_speed_abs, horizontal_speed_abs)
+        flight_path_angle_rel = np.arctan2(radial_speed_rel, horizontal_speed_rel)
+
+        x = position_history[:, 0]
+        y = position_history[:, 1]
+        z = position_history[:, 2]
+        inertial_longitude = np.arctan2(y, x)
+        geocentric_latitude = np.arctan2(z, np.hypot(x, y))
+
+        east_unit = np.column_stack((-np.sin(inertial_longitude), np.cos(inertial_longitude), np.zeros_like(inertial_longitude)))
+        north_unit = np.column_stack(
+            (
+                -np.sin(geocentric_latitude) * np.cos(inertial_longitude),
+                -np.sin(geocentric_latitude) * np.sin(inertial_longitude),
+                np.cos(geocentric_latitude),
+            )
+        )
+
+        east_speed_abs = np.einsum("ij,ij->i", velocity_history, east_unit)
+        north_speed_abs = np.einsum("ij,ij->i", velocity_history, north_unit)
+        east_speed_rel = np.einsum("ij,ij->i", velocity_rel, east_unit)
+        north_speed_rel = np.einsum("ij,ij->i", velocity_rel, north_unit)
+
+        velocity_azimuth_abs = np.arctan2(east_speed_abs, north_speed_abs)
+        velocity_azimuth_rel = np.arctan2(east_speed_rel, north_speed_rel)
+
+        dynamic_pressure = 0.5 * self.density * speed_rel_safe**2
+
+        return np.hstack(
+            (
+                flight_path_angle_rel[:, None],
+                flight_path_angle_abs[:, None],
+                velocity_azimuth_rel[:, None],
+                velocity_azimuth_abs[:, None],
+                dynamic_pressure[:, None],
+            )
+        )
+
 
     def _calculate_aerodynamics(self, position, velocity, area):
         velocity_rel = velocity - np.cross(omega_e, position)
@@ -145,11 +230,29 @@ class FlightSimulation:
         self.mass = state_history[-1, 6]
         self.acceleration = self._calculate_acceleration(self.position, self.velocity, self.mass)
 
+        geospatial_history = self._calculate_geospatial_history(state_history[:, :3], time_history)
+        flight_kinematics_history = self._calculate_flight_kinematics_history(
+            state_history[:, :3],
+            state_history[:, 3:6],
+        )
+
         self.history = {
             "time": time_history,
             "position": state_history[:, :3],
             "velocity": state_history[:, 3:6],
             "mass": state_history[:, 6],
+            "geospatial": geospatial_history,
+            "geocentric_latitude": geospatial_history[:, 0],
+            "geodetic_longitude": geospatial_history[:, 1],
+            "inertial_longitude": geospatial_history[:, 2],
+            "relative_longitude": geospatial_history[:, 3],
+            "absolute_height": geospatial_history[:, 4],
+            "flight_kinematics": flight_kinematics_history,
+            "relative_flight_path_angle": flight_kinematics_history[:, 0],
+            "absolute_flight_path_angle": flight_kinematics_history[:, 1],
+            "relative_velocity_azimuth": flight_kinematics_history[:, 2],
+            "absolute_velocity_azimuth": flight_kinematics_history[:, 3],
+            "dynamic_pressure": flight_kinematics_history[:, 4],
         }
 
         return self.history

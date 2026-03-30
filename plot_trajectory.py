@@ -9,6 +9,16 @@ def plot_(history):
     position = history["position"]
     velocity = history["velocity"]
     mass = history["mass"]
+    altitude_absolute = history["absolute_height"]
+    flight_path_angle_relative = np.degrees(history["relative_flight_path_angle"])
+    flight_path_angle_absolute = np.degrees(history["absolute_flight_path_angle"])
+    velocity_azimuth_relative = np.degrees(history["relative_velocity_azimuth"])
+    velocity_azimuth_absolute = np.degrees(history["absolute_velocity_azimuth"])
+    dynamic_pressure = history["dynamic_pressure"]
+    geocentric_latitude = np.degrees(history["geocentric_latitude"])
+    geodetic_longitude = np.degrees(history["geodetic_longitude"])
+    inertial_longitude = np.degrees(history["inertial_longitude"])
+    relative_longitude = np.degrees(history["relative_longitude"])
 
     # Inertial-frame trajectory coordinates.
     x = position[:, 0]
@@ -151,6 +161,59 @@ def plot_(history):
     ax_alt.set_ylabel("Altitude (m)")
     ax_alt.grid(True, alpha=0.3)
 
+    fig_angles = plt.figure(figsize=(12, 8))
+
+    ax_geo_lat = fig_angles.add_subplot(2, 1, 1)
+    ax_geo_lat.plot(time, geocentric_latitude, color="tab:blue", linewidth=2)
+    ax_geo_lat.set_title("Geocentric Latitude vs Time")
+    ax_geo_lat.set_xlabel("Time (s)")
+    ax_geo_lat.set_ylabel("Latitude (deg)")
+    ax_geo_lat.grid(True, alpha=0.3)
+
+    ax_lon = fig_angles.add_subplot(2, 1, 2)
+    ax_lon.plot(time, geodetic_longitude, label="Geodetic Longitude", color="tab:green")
+    ax_lon.plot(time, inertial_longitude, label="Inertial Longitude", color="tab:orange")
+    ax_lon.plot(time, relative_longitude, label="Relative Longitude", color="tab:red")
+    ax_lon.set_title("Longitude Components vs Time")
+    ax_lon.set_xlabel("Time (s)")
+    ax_lon.set_ylabel("Longitude (deg)")
+    ax_lon.grid(True, alpha=0.3)
+    ax_lon.legend()
+
+    fig_flight = plt.figure(figsize=(12, 10))
+
+    ax_alt_abs = fig_flight.add_subplot(3, 2, 1)
+    ax_alt_abs.plot(time, altitude_absolute, color="tab:green", linewidth=2)
+    ax_alt_abs.set_title("Absolute Altitude vs Time")
+    ax_alt_abs.set_xlabel("Time (s)")
+    ax_alt_abs.set_ylabel("Altitude (m)")
+    ax_alt_abs.grid(True, alpha=0.3)
+
+    ax_fpa = fig_flight.add_subplot(3, 2, 2)
+    ax_fpa.plot(time, flight_path_angle_absolute, label="Absolute FPA", color="tab:blue")
+    ax_fpa.plot(time, flight_path_angle_relative, label="Relative FPA", color="tab:orange")
+    ax_fpa.set_title("Flight Path Angle vs Time")
+    ax_fpa.set_xlabel("Time (s)")
+    ax_fpa.set_ylabel("Angle (deg)")
+    ax_fpa.grid(True, alpha=0.3)
+    ax_fpa.legend()
+
+    ax_az = fig_flight.add_subplot(3, 2, 3)
+    ax_az.plot(time, velocity_azimuth_absolute, label="Absolute Azimuth", color="tab:red")
+    ax_az.plot(time, velocity_azimuth_relative, label="Relative Azimuth", color="tab:purple")
+    ax_az.set_title("Velocity Azimuth vs Time")
+    ax_az.set_xlabel("Time (s)")
+    ax_az.set_ylabel("Angle (deg)")
+    ax_az.grid(True, alpha=0.3)
+    ax_az.legend()
+
+    ax_q = fig_flight.add_subplot(3, 2, 4)
+    ax_q.plot(time, dynamic_pressure, color="tab:brown", linewidth=2)
+    ax_q.set_title("Dynamic Pressure vs Time")
+    ax_q.set_xlabel("Time (s)")
+    ax_q.set_ylabel("Pressure (Pa)")
+    ax_q.grid(True, alpha=0.3)
+
     # 2. Acceleration Magnitude vs Time
     # (You'll need to compute this from your simulation's acceleration history)
     # acceleration_mag = np.linalg.norm(acceleration_history, axis=1)
@@ -168,6 +231,8 @@ def plot_(history):
     fig_traj.tight_layout()
     fig_geo.tight_layout()
     fig_metrics.tight_layout()
+    fig_angles.tight_layout()
+    fig_flight.tight_layout()
     plt.show()
 
     print("Trajectory and metrics plots generated successfully.")

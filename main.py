@@ -36,7 +36,7 @@ simulate = FlightSimulation(
 )
 
 # Perform trajectory simulation
-history = simulate.execute_flight(t_final=10.0, dt=0.1)
+history = simulate.execute_flight(t_final=100.0, dt=0.1)
 
 print("Completed trajectory simulation.")
 
