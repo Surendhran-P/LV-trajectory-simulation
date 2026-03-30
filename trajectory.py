@@ -148,17 +148,20 @@ class FlightSimulation:
         longitude = np.arctan2(position[:, 1], position[:, 0]) * 180.0 / np.pi # Inertial longitude in degrees
         return latitude, longitude
     
-    def _update_relative_geographic_coordinates(self, position):
-        pass
+    def _update_relative_geographic_coordinates(self, latitude, longitude, dt):
+        relative_latitude = latitude - self.latitude
+        relative_longitude = longitude - omega_e[2] * dt
+        return relative_latitude, relative_longitude
+        
 
     def _calculate_altitude(self, position):
         r = np.linalg.norm(position,axis=1)
         altitude = r - radius_earth  # Subtract Earth's radius to get altitude above sea level
         return altitude
 
-    def _calculate_flight_path_angles(self, velocity, position):
-        speed = np.linalg.norm(velocity,axis=1)
-        absoulute_flight_path_angle = np.arcsin(velocity[:, 2] / speed) * 180.0 / np.pi #wrong
+    def _calculate_flight_path_angles(self, velocity_rel, position):
+        speed = np.linalg.norm(velocity_rel, axis=1)
+        absoulute_flight_path_angle = np.arcsin(velocity_rel[:, 2] / speed) * 180.0 / np.pi 
         relative_flight_path_angle = absoulute_flight_path_angle - self.latitude
         return absoulute_flight_path_angle, relative_flight_path_angle
     
@@ -181,11 +184,7 @@ class FlightSimulation:
             t_final,
             dt,
         )
-        # self.position = state_history[-1, :3]
-        # self.velocity = state_history[-1, 3:6]
-        # self.mass = state_history[-1, 6]
-        # self.acceleration = self._calculate_acceleration(self.position, self.velocity, self.mass)
-
+       
         self.history = {
             "time": time_history,
             "position": state_history[:, :3],
@@ -195,7 +194,7 @@ class FlightSimulation:
 
         self.history["mach_number"] = self._calculate_mach_number(self.history["velocity"])
         self.history["latitude"], self.history["longitude"] = self._update_geographic_coordinates(self.history["position"])
-        # relative
+        self.history["relative_latitude"], self.history["relative_longitude"] = self._update_relative_geographic_coordinates(self.history["latitude"], self.history["longitude"], dt)
         self.history["altitude"] = self._calculate_altitude(self.history["position"])
         self.history["absolute_flight_path_angle"], self.history["relative_flight_path_angle"] = self._calculate_flight_path_angles(self.history["velocity"], self.history["position"])
         self.history["absolute_velocity_azimuth"], self.history["relative_velocity_azimuth"] = self._calculate_velocity_azimuth(self.history["velocity"])
