@@ -4,6 +4,7 @@ import initialise
 from transformation import *
 
 omega_e = initialise.omega_e
+radius_earth = initialise.R_e
 
 class FlightSimulation:
     def __init__(
@@ -100,9 +101,17 @@ class FlightSimulation:
         position = state[:3]
         velocity = state[3:6]
         mass = state[6]
+        # mach_number = state[7]
+        # rel_latitude = state[8]
+        # inertial_latitude = state[9]
+        # geodetic_latitude = state[10]
+        # geocentric_latitude = state[11]
+        # absolute_flight_path_angle = state[12]
+        # relative_flight_path_angle = state[13]
+        # dynamic_pressure = state[14]
 
-        acceleration = self._calculate_acceleration(position, velocity, mass)
         mass_derivative = -self.mass_flow_rate
+        acceleration = self._calculate_acceleration(position, velocity, mass)
 
         return np.hstack((velocity, acceleration, mass_derivative))
 
@@ -128,7 +137,40 @@ class FlightSimulation:
             states.append(y.copy())
 
         return np.array(times), np.vstack(states)
+    
+    def _calculate_mach_number(self, velocity):
+        speed_of_sound = 343.0  # m/s at sea level
+        return np.linalg.norm(velocity,axis=1) / speed_of_sound
+    
+    def _update_geographic_coordinates(self, position):
+        r = np.linalg.norm(position,axis=1)
+        latitude = np.arcsin(position[:, 2] / r) * 180.0 / np.pi # Geodetic latitude in degrees
+        longitude = np.arctan2(position[:, 1], position[:, 0]) * 180.0 / np.pi # Inertial longitude in degrees
+        return latitude, longitude
+    
+    def _update_relative_geographic_coordinates(self, position):
+        pass
 
+    def _calculate_altitude(self, position):
+        r = np.linalg.norm(position,axis=1)
+        altitude = r - radius_earth  # Subtract Earth's radius to get altitude above sea level
+        return altitude
+
+    def _calculate_flight_path_angles(self, velocity, position):
+        speed = np.linalg.norm(velocity,axis=1)
+        absoulute_flight_path_angle = np.arcsin(velocity[:, 2] / speed) * 180.0 / np.pi #wrong
+        relative_flight_path_angle = absoulute_flight_path_angle - self.latitude
+        return absoulute_flight_path_angle, relative_flight_path_angle
+    
+    def _calculate_velocity_azimuth(self, velocity):
+        absolute_velocity_azimuth = np.arctan2(velocity[:, 1], velocity[:, 0]) * 180.0 / np.pi
+        relative_velocity_azimuth = absolute_velocity_azimuth - self.azimuth # check
+        return absolute_velocity_azimuth, relative_velocity_azimuth
+    
+    def _caulculate_dynamic_pressure(self, velocity):
+        dynamic_pressure = 0.5 * self.density * np.linalg.norm(velocity, axis=1)**2
+        return dynamic_pressure
+    
     def execute_flight(self, t_final=10.0, dt=0.1):
         initial_state = np.hstack((self.position, self.velocity, self.mass))
 
@@ -139,11 +181,10 @@ class FlightSimulation:
             t_final,
             dt,
         )
-
-        self.position = state_history[-1, :3]
-        self.velocity = state_history[-1, 3:6]
-        self.mass = state_history[-1, 6]
-        self.acceleration = self._calculate_acceleration(self.position, self.velocity, self.mass)
+        # self.position = state_history[-1, :3]
+        # self.velocity = state_history[-1, 3:6]
+        # self.mass = state_history[-1, 6]
+        # self.acceleration = self._calculate_acceleration(self.position, self.velocity, self.mass)
 
         self.history = {
             "time": time_history,
@@ -151,5 +192,13 @@ class FlightSimulation:
             "velocity": state_history[:, 3:6],
             "mass": state_history[:, 6],
         }
+
+        self.history["mach_number"] = self._calculate_mach_number(self.history["velocity"])
+        self.history["latitude"], self.history["longitude"] = self._update_geographic_coordinates(self.history["position"])
+        # relative
+        self.history["altitude"] = self._calculate_altitude(self.history["position"])
+        self.history["absolute_flight_path_angle"], self.history["relative_flight_path_angle"] = self._calculate_flight_path_angles(self.history["velocity"], self.history["position"])
+        self.history["absolute_velocity_azimuth"], self.history["relative_velocity_azimuth"] = self._calculate_velocity_azimuth(self.history["velocity"])
+        self.history["dynamic_pressure"] = self._caulculate_dynamic_pressure(self.history["velocity"])
 
         return self.history

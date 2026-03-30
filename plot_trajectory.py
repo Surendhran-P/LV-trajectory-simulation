@@ -1,65 +1,32 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import initialise
-
 
 def plot_(history):
     time = history["time"]
     position = history["position"]
     velocity = history["velocity"]
     mass = history["mass"]
+    mach_number = history["mach_number"]
+    latitude = history["latitude"]
+    longitude = history["longitude"]
+    altitude = history["altitude"]
+    absolute_flight_path_angle = history["absolute_flight_path_angle"]
+    relative_flight_path_angle = history["relative_flight_path_angle"]
+    absolute_velocity_azimuth = history["absolute_velocity_azimuth"]
+    relative_velocity_azimuth = history["relative_velocity_azimuth"]
+    dynamic_pressure = history["dynamic_pressure"]
 
     # Inertial-frame trajectory coordinates.
     x = position[:, 0]
     y = position[:, 1]
     z = position[:, 2]
 
-    omega_earth = float(initialise.omega_e[2])
-
-
-    def inertial_to_earth_matrix(t):
-        theta = omega_earth * t
-        c = np.cos(theta)
-        s = np.sin(theta)
-        return np.array([
-            [c, s, 0.0],
-            [-s, c, 0.0],
-            [0.0, 0.0, 1.0],
-        ])
-
-
-    position_er = np.zeros_like(position)
-    for i, t in enumerate(time):
-        i_to_er = inertial_to_earth_matrix(t)
-        position_er[i] = i_to_er @ position[i]
-
-    # Convert Earth-rotating Cartesian coordinates to geodetic longitude, latitude, and height.
-    a = float(initialise.R_e)
-    b = float(initialise.R_p)
-    e2 = 1.0 - (b * b) / (a * a)
-    ep2 = (a * a - b * b) / (b * b)
-
-    x_er = position_er[:, 0]
-    y_er = position_er[:, 1]
-    z_er = position_er[:, 2]
-
-    longitude = np.degrees(np.arctan2(y_er, x_er))
-    p = np.sqrt(x_er * x_er + y_er * y_er)
-    theta = np.arctan2(z_er * a, p * b)
-    sin_theta = np.sin(theta)
-    cos_theta = np.cos(theta)
-    latitude = np.arctan2(z_er + ep2 * b * sin_theta**3, p - e2 * a * cos_theta**3)
-    sin_lat = np.sin(latitude)
-    n = a / np.sqrt(1.0 - e2 * sin_lat * sin_lat)
-    height = p / np.maximum(np.cos(latitude), 1e-12) - n
-    height_mag = np.abs(height)
-    latitude = np.degrees(latitude)
-
     launch_lat = latitude[0]
     launch_lon = longitude[0]
     relative_lat = latitude - launch_lat
     relative_lon = (longitude - launch_lon + 180.0) % 360.0 - 180.0
+    altitude_mag = np.abs(altitude)
 
     fig_traj = plt.figure(figsize=(8, 6))
 
@@ -93,16 +60,16 @@ def plot_(history):
     ax_geo.plot(
         relative_lon,
         relative_lat,
-        height_mag,
+        altitude_mag,
         color="tab:cyan",
         linewidth=2,
         label="Trajectory",
     )
-    ax_geo.scatter(0.0, 0.0, height_mag[0], color="green", s=50, label="Launch")
+    ax_geo.scatter(0.0, 0.0, altitude_mag[0], color="green", s=50, label="Launch")
     ax_geo.scatter(
         relative_lon[-1],
         relative_lat[-1],
-        height_mag[-1],
+        altitude_mag[-1],
         color="red",
         s=50,
         label="Final",
@@ -142,25 +109,62 @@ def plot_(history):
     ax_mass.grid(True, alpha=0.3)
     ax_mass.legend()
 
-    # True altitude change from launch radius in inertial coordinates.
-    altitude = np.linalg.norm(position, axis=1) - np.linalg.norm(position[0])
+    # True altitude change from launch radius.
+    altitude_relative = altitude - altitude[0]
     ax_alt = fig_metrics.add_subplot(2, 2, 3)
-    ax_alt.plot(time, altitude, color='tab:green', linewidth=2)
+    ax_alt.plot(time, altitude_relative, color='tab:green', linewidth=2)
     ax_alt.set_title("Altitude Above Launch Point vs Time")
     ax_alt.set_xlabel("Time (s)")
     ax_alt.set_ylabel("Altitude (m)")
     ax_alt.grid(True, alpha=0.3)
 
-    # 2. Acceleration Magnitude vs Time
-    # (You'll need to compute this from your simulation's acceleration history)
-    # acceleration_mag = np.linalg.norm(acceleration_history, axis=1)
-    # ax_accel = fig_metrics.add_subplot(2, 2, 4)
-    # ax_accel.plot(time, acceleration_mag, color='tab:red', label="|acceleration|")
-    # ax_accel.set_title("Net Acceleration vs Time")
-    # ax_accel.set_xlabel("Time (s)")
-    # ax_accel.set_ylabel("Acceleration (m/s²)")
-    # ax_accel.grid(True, alpha=0.3)
-    # ax_accel.legend()
+    fig_flight = plt.figure(figsize=(12, 10))
+
+    ax_alt_abs = fig_flight.add_subplot(3, 2, 1)
+    ax_alt_abs.plot(time, altitude, color="tab:green", linewidth=2)
+    ax_alt_abs.set_title("Absolute Altitude vs Time")
+    ax_alt_abs.set_xlabel("Time (s)")
+    ax_alt_abs.set_ylabel("Altitude (m)")
+    ax_alt_abs.grid(True, alpha=0.3)
+
+    ax_fpa = fig_flight.add_subplot(3, 2, 2)
+    ax_fpa.plot(time, absolute_flight_path_angle, label="Absolute FPA", color="tab:blue")
+    ax_fpa.plot(time, relative_flight_path_angle, label="Relative FPA", color="tab:orange")
+    ax_fpa.set_title("Flight Path Angle vs Time")
+    ax_fpa.set_xlabel("Time (s)")
+    ax_fpa.set_ylabel("Angle (deg)")
+    ax_fpa.grid(True, alpha=0.3)
+    ax_fpa.legend()
+
+    ax_az = fig_flight.add_subplot(3, 2, 3)
+    ax_az.plot(time, absolute_velocity_azimuth, label="Absolute Azimuth", color="tab:red")
+    ax_az.plot(time, relative_velocity_azimuth, label="Relative Azimuth", color="tab:purple")
+    ax_az.set_title("Velocity Azimuth vs Time")
+    ax_az.set_xlabel("Time (s)")
+    ax_az.set_ylabel("Angle (deg)")
+    ax_az.grid(True, alpha=0.3)
+    ax_az.legend()
+
+    ax_q = fig_flight.add_subplot(3, 2, 4)
+    ax_q.plot(time, dynamic_pressure, color="tab:brown", linewidth=2)
+    ax_q.set_title("Dynamic Pressure vs Time")
+    ax_q.set_xlabel("Time (s)")
+    ax_q.set_ylabel("Pressure (Pa)")
+    ax_q.grid(True, alpha=0.3)
+
+    ax_mach = fig_flight.add_subplot(3, 2, 5)
+    ax_mach.plot(time, mach_number, color="tab:gray", linewidth=2)
+    ax_mach.set_title("Mach Number vs Time")
+    ax_mach.set_xlabel("Time (s)")
+    ax_mach.set_ylabel("Mach")
+    ax_mach.grid(True, alpha=0.3)
+
+    ax_lon = fig_flight.add_subplot(3, 2, 6)
+    ax_lon.plot(time, longitude, color="tab:olive", linewidth=2)
+    ax_lon.set_title("Inertial Longitude vs Time")
+    ax_lon.set_xlabel("Time (s)")
+    ax_lon.set_ylabel("Longitude (deg)")
+    ax_lon.grid(True, alpha=0.3)
 
     # 3. Forces Analysis (Thrust vs Drag vs Gravity)
     # Plot each force component to diagnose issues
@@ -168,6 +172,7 @@ def plot_(history):
     fig_traj.tight_layout()
     fig_geo.tight_layout()
     fig_metrics.tight_layout()
+    fig_flight.tight_layout()
     plt.show()
 
     print("Trajectory and metrics plots generated successfully.")
