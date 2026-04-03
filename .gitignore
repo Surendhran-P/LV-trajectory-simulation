@@ -4,3 +4,5 @@ __pycache__/plot_trajectory.cpython-312.pyc
 __pycache__/trajectory.cpython-312.pyc
 __pycache__/staging.cpython-312.pyc
 __pycache__/transformation.cpython-312.pyc
+__pycache__/flight_duration.cpython-312.pyc
+__pycache__/save_to_csv.cpython-312.pyc

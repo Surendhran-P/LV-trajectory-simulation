@@ -57,6 +57,12 @@ class FlightSimulation:
 
     def _calculate_aerodynamics(self, position, velocity, area):
         velocity_rel = velocity - np.cross(omega_e, position)
+
+        vel_rel_b = np.linalg.multi_dot([LB(self.pitch, self.yaw, self.roll), IL(self.latitude, self.longitude, self.azimuth), velocity_rel])
+        u, v, w = vel_rel_b[0], vel_rel_b[1], vel_rel_b[2]
+        self.angle_of_attack = np.arctan2(w, u) * 180.0 / np.pi
+        self.sideslip = np.arctan2(v, np.sqrt(u**2 + w**2)) * 180.0 / np.pi
+
         dynamic_pressure = 0.5 * self.density * np.linalg.norm(velocity_rel)**2
         drag_magnitude = dynamic_pressure * self.drag_coefficient * area
 

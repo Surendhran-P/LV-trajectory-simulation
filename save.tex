@@ -1,0 +1,18 @@
+    def _calculate_aerodynamics(self, position, velocity, area):
+        velocity_rel = velocity - np.cross(omega_e, position)
+        dynamic_pressure = 0.5 * self.density * np.linalg.norm(velocity_rel)**2
+        drag_magnitude = dynamic_pressure * self.drag_coefficient * area
+
+        A_a = np.array([-drag_magnitude, 0, 0])  # Assuming drag acts opposite to velocity vector
+
+        A_i = np.linalg.multi_dot([LI(self.latitude, self.longitude, self.azimuth),
+                                   BL(self.pitch, self.yaw, self.roll),
+                                   AB(self.angle_of_attack, self.sideslip, self.aerodynamic_roll), 
+                                   A_a])
+
+        return A_i
+
+
+\begin{equation}
+    \mathbf{v}{rel,B}=L_B(\text{pitch,yaw,roll});I_L(\text{lat,lon,az});\mathbf{v}{rel,I}
+\end{equation}

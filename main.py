@@ -9,11 +9,9 @@ rocket = Rocket(payload_mass=3500, target_delta_v=5199)
 
 stage1 = RocketStage(name="Stage 1", isp=275, structural_ratio=0.15, thrust=2496e3)
 stage2 = RocketStage(name="Stage 2", isp=295, structural_ratio=0.12, thrust=250e3)
-stage3 = RocketStage(name="Stage 3", isp=292, structural_ratio=0.1, thrust=160e3)
 
 rocket.add_stage(stage1)
 rocket.add_stage(stage2)
-rocket.add_stage(stage3)
 
 otpimal_eta = rocket.optimize_lagrange()
 rocket.calculate_stage_masses(otpimal_eta)
