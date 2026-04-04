@@ -73,3 +73,9 @@ class Rocket:
         for stage in self.stages:
             stage.structural_mass = stage.structural_ratio * stage.step_mass
             stage.propellant_mass = stage.step_mass - stage.structural_mass
+
+    def total_burn_time(self, stage):
+        if stage.mass_flow_rate > 0:
+            return stage.propellant_mass / stage.mass_flow_rate
+        else:
+            return 0

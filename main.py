@@ -5,18 +5,23 @@ from trajectory import *
 from plot_trajectory import plot_
 
 # Sizing of 3 stage rocket
-rocket = Rocket(payload_mass=3500, target_delta_v=5199)
+rocket = Rocket(payload_mass=3500, target_delta_v=10000)
 
-stage1 = RocketStage(name="Stage 1", isp=275, structural_ratio=0.15, thrust=8496e2)
-stage2 = RocketStage(name="Stage 2", isp=295, structural_ratio=0.12, thrust=750e2)
+stage1 = RocketStage(name="Stage 1", isp=350, structural_ratio=0.15, thrust=2496e3)
+stage2 = RocketStage(name="Stage 2", isp=370, structural_ratio=0.12, thrust=1060e3)
+stage3 = RocketStage(name="Stage 3", isp=400, structural_ratio=0.1, thrust=160e3)
 
 rocket.add_stage(stage1)
 rocket.add_stage(stage2)
+rocket.add_stage(stage3)
 
 otpimal_eta = rocket.optimize_lagrange()
 rocket.calculate_stage_masses(otpimal_eta)
 
 print("Staging completed.")
+
+totalburn_time = sum(rocket.total_burn_time(stage) for stage in rocket.stages)
+print(f"Total burn time: ", totalburn_time, " seconds")
 
 # Initial conditions for trajectory simulation
 result = initialise.initial_state(latitude=8.531, longitude=76.875, azimuth=225)

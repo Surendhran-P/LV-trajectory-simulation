@@ -321,13 +321,16 @@ class FlightSimulation:
         initial_state = np.hstack((self.position, self.velocity, self.mass))
 
         vertical_time, vertical_states = self.vertical_ascent(initial_state, dt, t_start=0.0, t_final=5.0)
-        pitch_time, pitch_states = self.pitch_maneuver(vertical_states[-1], dt, t_start=vertical_time[-1], pitch_rate=-0.1, t_final=12.0)
-        gravity_time, gravity_states = self.gravity_turn(pitch_states[-1], dt, t_start=pitch_time[-1], t_final=80.0)
-        pitch_time2, pitch_states2 = self.pitch_maneuver(gravity_states[-1], dt, t_start=gravity_time[-1], pitch_rate=-6, t_final=90.0)
-        pitch_time3, pitch_states3 = self.pitch_maneuver(pitch_states2[-1], dt, t_start=pitch_time2[-1], pitch_rate=-5, t_final=95.5)
+        pitch_time, pitch_states = self.pitch_maneuver(vertical_states[-1], dt, t_start=vertical_time[-1], pitch_rate=-0.1, t_final=10.0)
+        gravity_time, gravity_states = self.gravity_turn(pitch_states[-1], dt, t_start=pitch_time[-1], t_final=100)
+        pitch_time2, pitch_states2 = self.pitch_maneuver(gravity_states[-1], dt, t_start=gravity_time[-1], pitch_rate=-0.1, t_final=110)
+        gravity_time2, gravity_states2 = self.gravity_turn(pitch_states2[-1], dt, t_start=pitch_time2[-1], t_final=350)
+        pitch_time3, pitch_states3 = self.pitch_maneuver(gravity_states2[-1], dt, t_start=gravity_time2[-1], pitch_rate=0.1, t_final=400)
+        pitch_time4, pitch_states4 = self.pitch_maneuver(pitch_states3[-1], dt, t_start=pitch_time3[-1], pitch_rate=0.2, t_final=410)
 
-        time_history = np.concatenate((vertical_time, pitch_time, gravity_time, pitch_time2, pitch_time3))
-        state_history = np.vstack((vertical_states, pitch_states, gravity_states, pitch_states2, pitch_states3))
+
+        time_history = np.concatenate((vertical_time, pitch_time, gravity_time, pitch_time2, gravity_time2, pitch_time3, pitch_time4))
+        state_history = np.vstack((vertical_states, pitch_states, gravity_states, pitch_states2, gravity_states2, pitch_states3, pitch_states4))
         self.history = {
             "time": time_history,
             "position": state_history[:, :3],
@@ -344,5 +347,5 @@ class FlightSimulation:
         self.history["dynamic_pressure"] = self._caulculate_dynamic_pressure(self.history["velocity"])
 
         print("Pitch final: ",self.pitch)
-
+        print("Final velocity: ", self.velocity)
         return self.history
