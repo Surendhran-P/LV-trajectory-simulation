@@ -26,7 +26,7 @@ def plot_(history):
     speed = np.linalg.norm(velocity, axis=1)
     position_magnitude = np.linalg.norm(position, axis=1)
 
-    altitude_mag = np.abs(altitude)
+    altitude_mag = np.abs(altitude) / 1000.0
 
     # Window 1: relative latitude/longitude with altitude magnitude.
     fig_window1 = plt.figure(figsize=(9, 7))
@@ -51,7 +51,7 @@ def plot_(history):
     ax_window1.set_title("Window 1: Relative Lat-Lon-Altitude Magnitude")
     ax_window1.set_xlabel("Relative Latitude (deg)")
     ax_window1.set_ylabel("Relative Longitude (deg)")
-    ax_window1.set_zlabel("|Altitude| (m)")
+    ax_window1.set_zlabel("|Altitude| (km)")
     ax_window1.legend()
 
     # Window 2: inertial longitude/geodetic latitude with altitude.
@@ -60,16 +60,16 @@ def plot_(history):
     ax_window2.plot(
         longitude,
         latitude,
-        np.absolute(altitude),
+        np.absolute(altitude) / 1000.0,
         color="tab:cyan",
         linewidth=2,
         label="Trajectory",
     )
-    ax_window2.scatter(longitude[0], latitude[0], np.absolute(altitude[0]), color="green", s=55, label="Launch")
+    ax_window2.scatter(longitude[0], latitude[0], np.absolute(altitude[0]) / 1000.0, color="green", s=55, label="Launch")
     ax_window2.scatter(
         longitude[-1],
         latitude[-1],
-        np.absolute(altitude[-1]),
+        np.absolute(altitude[-1]) / 1000.0,
         color="red",
         s=55,
         label="Final",
@@ -77,16 +77,16 @@ def plot_(history):
     ax_window2.set_title("Window 2: Inertial Longitude-Geodetic Latitude-Altitude")
     ax_window2.set_xlabel("Inertial Longitude (deg)")
     ax_window2.set_ylabel("Geodetic Latitude (deg)")
-    ax_window2.set_zlabel("Altitude (m)")
+    ax_window2.set_zlabel("Altitude (km)")
     ax_window2.legend()
 
     # Window 3: requested flight metrics with time on x-axis.
     fig_window3, axs_window3 = plt.subplots(2, 2, figsize=(12, 8))
 
-    axs_window3[0, 0].plot(time, np.absolute(altitude), color="tab:green", linewidth=2)
+    axs_window3[0, 0].plot(time, np.absolute(altitude) / 1000.0, color="tab:green", linewidth=2)
     axs_window3[0, 0].set_title("Altitude vs Time")
     axs_window3[0, 0].set_xlabel("Time (s)")
-    axs_window3[0, 0].set_ylabel("Altitude (m)")
+    axs_window3[0, 0].set_ylabel("Altitude (km)")
     axs_window3[0, 0].grid(True, alpha=0.3)
 
     axs_window3[0, 1].plot(time, absolute_flight_path_angle, color="tab:blue", linewidth=2)

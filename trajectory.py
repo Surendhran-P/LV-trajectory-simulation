@@ -165,6 +165,8 @@ class FlightSimulation:
             y = y + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
             t = t + h
 
+            self.position = y[:3]
+            self.velocity = y[3:6]
             times.append(t)
             states.append(y.copy())
 
@@ -209,6 +211,10 @@ class FlightSimulation:
         duration = t_final - t_start
 
         def gravity_turn_guidance(t, state, phase_start, phase_duration):
+            def unwrap_angle_deg(target_angle, current_angle):
+                delta = (target_angle - current_angle + 180.0) % 360.0 - 180.0
+                return current_angle + delta
+
             position = state[:3]
             velocity = state[3:6]
 
@@ -220,8 +226,11 @@ class FlightSimulation:
             velocity_rel_l = IL(self.latitude, self.longitude, self.azimuth) @ velocity_rel_i
             u_l, v_l, w_l = velocity_rel_l
 
-            self.yaw = np.degrees(np.arctan2(v_l, np.hypot(u_l, w_l)))
-            self.pitch = np.degrees(np.arctan2(-w_l, u_l))
+            raw_yaw = np.degrees(np.arctan2(v_l, np.hypot(u_l, w_l)))
+            raw_pitch = np.degrees(np.arctan2(-w_l, u_l))
+
+            self.yaw = unwrap_angle_deg(raw_yaw, self.yaw)
+            self.pitch = unwrap_angle_deg(raw_pitch, self.pitch)
 
         return self._run_phase(t_start, initial_state, duration, dt, guidance_fn=gravity_turn_guidance)
 
@@ -229,10 +238,10 @@ class FlightSimulation:
         initial_state = np.hstack((self.position, self.velocity, self.mass))
 
         vertical_time, vertical_states = self.vertical_ascent(initial_state, dt, t_start=0.0, t_final=5.0)
-        pitch_time, pitch_states = self.pitch_maneuver(vertical_states[-1], dt, t_start=vertical_time[-1], pitch_rate=-0.5, t_final=7.0)
-        gravity_time, gravity_states = self.gravity_turn(pitch_states[-1], dt, t_start=pitch_time[-1], t_final=8.0)
-        pitch_time2, pitch_states2 = self.pitch_maneuver(gravity_states[-1], dt, t_start=gravity_time[-1], pitch_rate=-2, t_final=30.0)
-        pitch_time3, pitch_states3 = self.pitch_maneuver(pitch_states2[-1], dt, t_start=pitch_time2[-1], pitch_rate=-4, t_final=40.0)
+        pitch_time, pitch_states = self.pitch_maneuver(vertical_states[-1], dt, t_start=vertical_time[-1], pitch_rate=-0.1, t_final=12.0)
+        gravity_time, gravity_states = self.gravity_turn(pitch_states[-1], dt, t_start=pitch_time[-1], t_final=80.0)
+        pitch_time2, pitch_states2 = self.pitch_maneuver(gravity_states[-1], dt, t_start=gravity_time[-1], pitch_rate=-6, t_final=90.0)
+        pitch_time3, pitch_states3 = self.pitch_maneuver(pitch_states2[-1], dt, t_start=pitch_time2[-1], pitch_rate=-5, t_final=95.5)
 
         time_history = np.concatenate((vertical_time, pitch_time, gravity_time, pitch_time2, pitch_time3))
         state_history = np.vstack((vertical_states, pitch_states, gravity_states, pitch_states2, pitch_states3))
