@@ -147,5 +147,3 @@ def plot_(history):
     fig_window3.tight_layout()
     fig_window4.tight_layout()
     plt.show()
-
-    print("Trajectory plots generated successfully.")

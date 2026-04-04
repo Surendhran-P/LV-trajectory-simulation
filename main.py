@@ -1,4 +1,3 @@
-import numpy as np
 from staging import Rocket, RocketStage
 import initialise
 from trajectory import *
@@ -38,6 +37,7 @@ simulate = FlightSimulation(
     longitude=76.875,
     azimuth=225,
 )
+print("Initial conditions set. Starting trajectory simulation...")
 
 # Perform trajectory simulation
 history = simulate.execute_flight(dt=0.1)
@@ -46,5 +46,3 @@ print("Completed trajectory simulation.")
 
 # Plot the trajectory
 plot_(history)
-
-print("Trajectory plotted.")

@@ -60,7 +60,7 @@ class FlightSimulation:
         self.sideslip = sideslip
         self.aerodynamic_roll = aerodynamic_roll
 
-        self.density = 1.225  # kg/m^3, sea level standard density  ## Needs to be changed
+        self.density = 1.225  # kg/m^3
 
         self.history = {}  # To store the trajectory history
 
@@ -202,7 +202,7 @@ class FlightSimulation:
     
     def _calculate_velocity_azimuth(self, velocity):
         absolute_velocity_azimuth = np.arctan2(velocity[:, 1], velocity[:, 0]) * 180.0 / np.pi
-        relative_velocity_azimuth = absolute_velocity_azimuth - self.azimuth # check
+        relative_velocity_azimuth = absolute_velocity_azimuth - self.azimuth
         return absolute_velocity_azimuth, relative_velocity_azimuth
     
     def _caulculate_dynamic_pressure(self, velocity):
@@ -346,6 +346,4 @@ class FlightSimulation:
         self.history["absolute_velocity_azimuth"], self.history["relative_velocity_azimuth"] = self._calculate_velocity_azimuth(self.history["velocity"])
         self.history["dynamic_pressure"] = self._caulculate_dynamic_pressure(self.history["velocity"])
 
-        print("Pitch final: ",self.pitch)
-        print("Final velocity: ", self.velocity)
         return self.history
