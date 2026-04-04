@@ -28,6 +28,7 @@ simulate = FlightSimulation(
     initial_velocity=result[1],
     area=3.14159,
     thrust=rocket.stages[0].thrust,
+    rocket=rocket,
     latitude=8.531,
     longitude=76.875,
     azimuth=225,

@@ -25,6 +25,7 @@ class FlightSimulation:
         angle_of_attack=0.0,
         sideslip=0.0,
         aerodynamic_roll=0.0,
+        rocket=None,
     ):
 
         # Initial conditions
@@ -38,6 +39,15 @@ class FlightSimulation:
         self.mass_flow_rate = mass_flow_rate
         self.drag_coefficient = drag_coefficient
         self.thrust = thrust
+        self.rocket = rocket
+        self.stages = list(rocket.stages) if rocket is not None else []
+
+        self.stage_schedule = []
+        self._next_stage_to_separate = 0
+        self._stage_simulation_start_time = 0.0
+        if self.stages:
+            self._configure_stage_schedule()
+            self._update_stage_parameters(0.0)
 
         # Vehicle orientation and aerodynamic angles in degrees.
         self.latitude = latitude
@@ -53,6 +63,67 @@ class FlightSimulation:
         self.density = 1.225  # kg/m^3, sea level standard density  ## Needs to be changed
 
         self.history = {}  # To store the trajectory history
+
+    def _configure_stage_schedule(self):
+        self.stage_schedule = []
+        stage_start_time = 0.0
+
+        for stage in self.stages:
+            if stage.mass_flow_rate <= 0.0:
+                burn_duration = 0.0
+            else:
+                burn_duration = stage.propellant_mass / stage.mass_flow_rate
+
+            stage_end_time = stage_start_time + max(burn_duration, 0.0)
+            self.stage_schedule.append(
+                {
+                    "name": stage.name,
+                    "start_time": stage_start_time,
+                    "end_time": stage_end_time,
+                    "thrust": stage.thrust,
+                    "mass_flow_rate": stage.mass_flow_rate,
+                    "structural_mass": stage.structural_mass,
+                }
+            )
+            stage_start_time = stage_end_time
+
+    def _update_stage_parameters(self, absolute_time):
+        if not self.stage_schedule:
+            return
+
+        mission_time = absolute_time - self._stage_simulation_start_time
+        for stage in self.stage_schedule:
+            if stage["start_time"] <= mission_time < stage["end_time"]:
+                self.thrust = stage["thrust"]
+                self.mass_flow_rate = stage["mass_flow_rate"]
+                return
+
+        self.thrust = 0.0
+        self.mass_flow_rate = 0.0
+
+    def _next_stage_event_time(self):
+        if not self.stage_schedule:
+            return None
+
+        if self._next_stage_to_separate >= len(self.stage_schedule):
+            return None
+
+        return self._stage_simulation_start_time + self.stage_schedule[self._next_stage_to_separate]["end_time"]
+
+    def _apply_stage_separation(self, absolute_time, state):
+        if not self.stage_schedule:
+            return
+
+        mission_time = absolute_time - self._stage_simulation_start_time
+        separation_tolerance = 1e-9
+
+        while self._next_stage_to_separate < len(self.stage_schedule):
+            current_stage = self.stage_schedule[self._next_stage_to_separate]
+            if mission_time + separation_tolerance < current_stage["end_time"]:
+                break
+
+            state[6] = max(state[6] - current_stage["structural_mass"], 1e-6)
+            self._next_stage_to_separate += 1
 
 
     def _calculate_aerodynamics(self, position, velocity, area):
@@ -142,6 +213,8 @@ class FlightSimulation:
         position = state[:3]
         velocity = state[3:6]
         mass = state[6]
+
+        self._update_stage_parameters(t)
         mass_derivative = -self.mass_flow_rate
         acceleration = self._calculate_acceleration(position, velocity, mass)
 
@@ -153,9 +226,14 @@ class FlightSimulation:
 
         t = float(t0)
         y = np.array(y0, dtype=float)
+        self._apply_stage_separation(t, y)
 
         while t < t_final:
             h = min(dt, t_final - t)
+
+            next_event_time = self._next_stage_event_time()
+            if next_event_time is not None and t < next_event_time < t + h:
+                h = next_event_time - t
 
             k1 = derivative_fn(t, y)
             k2 = derivative_fn(t + 0.5 * h, y + 0.5 * h * k1)
@@ -164,6 +242,7 @@ class FlightSimulation:
 
             y = y + (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
             t = t + h
+            self._apply_stage_separation(t, y)
 
             self.position = y[:3]
             self.velocity = y[3:6]
@@ -235,6 +314,10 @@ class FlightSimulation:
         return self._run_phase(t_start, initial_state, duration, dt, guidance_fn=gravity_turn_guidance)
 
     def execute_flight(self, dt=0.1):
+        self._next_stage_to_separate = 0
+        self._stage_simulation_start_time = 0.0
+        self._update_stage_parameters(0.0)
+
         initial_state = np.hstack((self.position, self.velocity, self.mass))
 
         vertical_time, vertical_states = self.vertical_ascent(initial_state, dt, t_start=0.0, t_final=5.0)
