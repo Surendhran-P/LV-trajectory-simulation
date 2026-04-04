@@ -103,19 +103,45 @@ class FlightSimulation:
         self.acceleration = G_i + (A_i + T_i) / effective_mass
         return self.acceleration
 
+    def _calculate_mach_number(self, velocity):
+        speed_of_sound = 343.0  # m/s at sea level
+        return np.linalg.norm(velocity,axis=1) / speed_of_sound
+    
+    def _update_geographic_coordinates(self, position):
+        r = np.linalg.norm(position,axis=1)
+        latitude = np.arcsin(position[:, 2] / r) * 180.0 / np.pi # Geodetic latitude in degrees
+        longitude = np.arctan2(position[:, 1], position[:, 0]) * 180.0 / np.pi # Inertial longitude in degrees
+        return latitude, longitude
+    
+    def _update_relative_geographic_coordinates(self, latitude, longitude, dt):
+        relative_latitude = latitude - self.latitude
+        relative_longitude = longitude - omega_e[2] * dt
+        return relative_latitude, relative_longitude 
+
+    def _calculate_altitude(self, position):
+        r = np.linalg.norm(position,axis=1)
+        altitude = r - radius_earth  # Subtract Earth's radius to get altitude above sea level
+        return altitude
+
+    def _calculate_flight_path_angles(self, velocity_rel, position):
+        speed = np.linalg.norm(velocity_rel, axis=1)
+        absoulute_flight_path_angle = np.arcsin(velocity_rel[:, 2] / speed) * 180.0 / np.pi 
+        relative_flight_path_angle = absoulute_flight_path_angle - self.latitude
+        return absoulute_flight_path_angle, relative_flight_path_angle
+    
+    def _calculate_velocity_azimuth(self, velocity):
+        absolute_velocity_azimuth = np.arctan2(velocity[:, 1], velocity[:, 0]) * 180.0 / np.pi
+        relative_velocity_azimuth = absolute_velocity_azimuth - self.azimuth # check
+        return absolute_velocity_azimuth, relative_velocity_azimuth
+    
+    def _caulculate_dynamic_pressure(self, velocity):
+        dynamic_pressure = 0.5 * self.density * np.linalg.norm(velocity, axis=1)**2
+        return dynamic_pressure
+    
     def _state_derivative(self, t, state):
         position = state[:3]
         velocity = state[3:6]
         mass = state[6]
-        # mach_number = state[7]
-        # rel_latitude = state[8]
-        # inertial_latitude = state[9]
-        # geodetic_latitude = state[10]
-        # geocentric_latitude = state[11]
-        # absolute_flight_path_angle = state[12]
-        # relative_flight_path_angle = state[13]
-        # dynamic_pressure = state[14]
-
         mass_derivative = -self.mass_flow_rate
         acceleration = self._calculate_acceleration(position, velocity, mass)
 
@@ -144,53 +170,72 @@ class FlightSimulation:
 
         return np.array(times), np.vstack(states)
     
-    def _calculate_mach_number(self, velocity):
-        speed_of_sound = 343.0  # m/s at sea level
-        return np.linalg.norm(velocity,axis=1) / speed_of_sound
-    
-    def _update_geographic_coordinates(self, position):
-        r = np.linalg.norm(position,axis=1)
-        latitude = np.arcsin(position[:, 2] / r) * 180.0 / np.pi # Geodetic latitude in degrees
-        longitude = np.arctan2(position[:, 1], position[:, 0]) * 180.0 / np.pi # Inertial longitude in degrees
-        return latitude, longitude
-    
-    def _update_relative_geographic_coordinates(self, latitude, longitude, dt):
-        relative_latitude = latitude - self.latitude
-        relative_longitude = longitude - omega_e[2] * dt
-        return relative_latitude, relative_longitude
-        
+    def _run_phase(self, start_time, initial_state, duration, dt, guidance_fn=None):
 
-    def _calculate_altitude(self, position):
-        r = np.linalg.norm(position,axis=1)
-        altitude = r - radius_earth  # Subtract Earth's radius to get altitude above sea level
-        return altitude
+        phase_end_time = float(start_time + duration)
 
-    def _calculate_flight_path_angles(self, velocity_rel, position):
-        speed = np.linalg.norm(velocity_rel, axis=1)
-        absoulute_flight_path_angle = np.arcsin(velocity_rel[:, 2] / speed) * 180.0 / np.pi 
-        relative_flight_path_angle = absoulute_flight_path_angle - self.latitude
-        return absoulute_flight_path_angle, relative_flight_path_angle
-    
-    def _calculate_velocity_azimuth(self, velocity):
-        absolute_velocity_azimuth = np.arctan2(velocity[:, 1], velocity[:, 0]) * 180.0 / np.pi
-        relative_velocity_azimuth = absolute_velocity_azimuth - self.azimuth # check
-        return absolute_velocity_azimuth, relative_velocity_azimuth
-    
-    def _caulculate_dynamic_pressure(self, velocity):
-        dynamic_pressure = 0.5 * self.density * np.linalg.norm(velocity, axis=1)**2
-        return dynamic_pressure
-    
-    def execute_flight(self, t_final=10.0, dt=0.1):
-        initial_state = np.hstack((self.position, self.velocity, self.mass))
+        def phase_derivative(t, state):
+            if guidance_fn is not None:
+                guidance_fn(t, state, start_time, duration)
+            return self._state_derivative(t, state)
 
-        time_history, state_history = self.rk4(
-            self._state_derivative,
-            0.0,
+        return self.rk4(
+            phase_derivative,
+            start_time,
             initial_state,
-            t_final,
+            phase_end_time,
             dt,
         )
-       
+
+    def vertical_ascent(self, initial_state, dt, t_start=0.0, t_final=5.0):
+        def vertical_guidance(t, state, phase_start, phase_duration):
+            self.pitch = 90.0
+        duration = t_final - t_start
+        return self._run_phase(t_start, initial_state, duration, dt, guidance_fn=vertical_guidance)
+    
+    def pitch_maneuver(self, initial_state, dt, t_start, pitch_rate, t_final):
+        initial_pitch = self.pitch
+        duration = t_final - t_start
+        target_pitch = initial_pitch + pitch_rate * duration
+
+        def pitch_guidance(t, state, phase_start, phase_duration):
+            progress = (t - phase_start) / phase_duration
+            progress = np.clip(progress, 0.0, 1.0)
+            self.pitch = initial_pitch + (target_pitch - initial_pitch) * progress
+
+        return self._run_phase(t_start, initial_state, duration, dt, guidance_fn=pitch_guidance)
+
+    def gravity_turn(self, initial_state, dt, t_start, t_final):
+        duration = t_final - t_start
+
+        def gravity_turn_guidance(t, state, phase_start, phase_duration):
+            position = state[:3]
+            velocity = state[3:6]
+
+            velocity_rel_i = velocity - np.cross(omega_e, position)
+            if np.linalg.norm(velocity_rel_i) < 1e-6:
+                return
+
+            # Maintain alpha ~= 0 and beta ~= 0 by aligning body x-axis with relative wind.
+            velocity_rel_l = IL(self.latitude, self.longitude, self.azimuth) @ velocity_rel_i
+            u_l, v_l, w_l = velocity_rel_l
+
+            self.yaw = np.degrees(np.arctan2(v_l, np.hypot(u_l, w_l)))
+            self.pitch = np.degrees(np.arctan2(-w_l, u_l))
+
+        return self._run_phase(t_start, initial_state, duration, dt, guidance_fn=gravity_turn_guidance)
+
+    def execute_flight(self, dt=0.1):
+        initial_state = np.hstack((self.position, self.velocity, self.mass))
+
+        vertical_time, vertical_states = self.vertical_ascent(initial_state, dt, t_start=0.0, t_final=5.0)
+        pitch_time, pitch_states = self.pitch_maneuver(vertical_states[-1], dt, t_start=vertical_time[-1], pitch_rate=-0.5, t_final=7.0)
+        gravity_time, gravity_states = self.gravity_turn(pitch_states[-1], dt, t_start=pitch_time[-1], t_final=8.0)
+        pitch_time2, pitch_states2 = self.pitch_maneuver(gravity_states[-1], dt, t_start=gravity_time[-1], pitch_rate=-2, t_final=30.0)
+        pitch_time3, pitch_states3 = self.pitch_maneuver(pitch_states2[-1], dt, t_start=pitch_time2[-1], pitch_rate=-4, t_final=40.0)
+
+        time_history = np.concatenate((vertical_time, pitch_time, gravity_time, pitch_time2, pitch_time3))
+        state_history = np.vstack((vertical_states, pitch_states, gravity_states, pitch_states2, pitch_states3))
         self.history = {
             "time": time_history,
             "position": state_history[:, :3],
@@ -205,5 +250,7 @@ class FlightSimulation:
         self.history["absolute_flight_path_angle"], self.history["relative_flight_path_angle"] = self._calculate_flight_path_angles(self.history["velocity"], self.history["position"])
         self.history["absolute_velocity_azimuth"], self.history["relative_velocity_azimuth"] = self._calculate_velocity_azimuth(self.history["velocity"])
         self.history["dynamic_pressure"] = self._caulculate_dynamic_pressure(self.history["velocity"])
+
+        print("Pitch final: ",self.pitch)
 
         return self.history

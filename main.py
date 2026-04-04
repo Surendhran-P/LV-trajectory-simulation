@@ -7,8 +7,8 @@ from plot_trajectory import plot_
 # Sizing of 3 stage rocket
 rocket = Rocket(payload_mass=3500, target_delta_v=5199)
 
-stage1 = RocketStage(name="Stage 1", isp=275, structural_ratio=0.15, thrust=2496e3)
-stage2 = RocketStage(name="Stage 2", isp=295, structural_ratio=0.12, thrust=250e3)
+stage1 = RocketStage(name="Stage 1", isp=275, structural_ratio=0.15, thrust=2496e1)
+stage2 = RocketStage(name="Stage 2", isp=295, structural_ratio=0.12, thrust=250e1)
 
 rocket.add_stage(stage1)
 rocket.add_stage(stage2)
@@ -19,7 +19,7 @@ rocket.calculate_stage_masses(otpimal_eta)
 print("Staging completed.")
 
 # Initial conditions for trajectory simulation
-result = initialise.initial_state(latitude=8.531, longitude=76.875, azimuth=225, cg_pos=2)
+result = initialise.initial_state(latitude=8.531, longitude=76.875, azimuth=225)
 simulate = FlightSimulation(
     initial_mass=rocket.total_mass,
     mass_flow_rate=rocket.stages[0].mass_flow_rate,
@@ -34,7 +34,7 @@ simulate = FlightSimulation(
 )
 
 # Perform trajectory simulation
-history = simulate.execute_flight(t_final=10.0, dt=0.1)
+history = simulate.execute_flight(dt=0.1)
 
 print("Completed trajectory simulation.")
 
