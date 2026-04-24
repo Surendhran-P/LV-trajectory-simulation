@@ -5,6 +5,8 @@ omega_e=np.array([0, 0, 7.2921159E-5]) # Earth's angular velocity in rads per se
 R_e = 6378165.8 # Earth's equitorial radius in meters
 R_p = 6356783.8 # Earth's polar radius in meters
 
+speed_of_sound = 340.29 # Speed of sound at sea level in m/s
+
 k = (R_e/R_p)**2
 
 def initial_state(latitude, longitude, azimuth, cg_pos=0):

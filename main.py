@@ -1,7 +1,7 @@
 import numpy as np
 from staging import Rocket, RocketStage
 import initialise
-from trajectory import *
+# from trajectory import *
 from plot_trajectory import plot_
 
 # Sizing of 3 stage rocket
